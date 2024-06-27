@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeus Statistics</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Comic+Sans+MS:wght@400;700&display=swap');
+        
+        body { 
+            font-family: 'Comic Sans MS', cursive, sans-serif; 
+            margin: 20px; 
+            background-color: #1e1e1e; 
+            color: #FFD700; 
+        }
+        .container { 
+            max-width: 800px; 
+            margin: auto; 
+            text-align: center; 
+        }
+        .button { 
+            margin: 10px 5px; 
+            padding: 10px 20px; 
+            font-size: 16px; 
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            color: #000; 
+            background-color: #FFD700; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 5px;
+        }
+        .button:hover { 
+            background-color: #FFA500; 
+        }
+        .button:disabled { 
+            background-color: #555; 
+            cursor: not-allowed;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            background-color: #333; 
+            color: #FFD700; 
+        }
+        table, th, td { 
+            border: 1px solid #FFD700; 
+        }
+        th, td { 
+            padding: 12px; 
+            text-align: center; 
+        }
+        th { 
+            background-color: #555; 
+        }
+        input[type=number] { 
+            width: 100px; 
+            padding: 5px; 
+            font-size: 16px; 
+            text-align: center; 
+            color: #000; 
+            border-radius: 5px;
+        }
+        .balance-container {
+            margin: 20px 0;
+            font-size: 18px;
+        }
+        #chart-container {
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Zeus Statistics</h1>
+        <div class="balance-container">
+            <label for="initial-balance">Initial Balance ($):</label>
+            <input type="number" id="initial-balance" name="initial-balance" value="10000">
+            <button class="button" id="set-initial" onclick="setInitialBalance()">SET Initial</button>
+        </div>
+        <button class="button" id="add-tp" onclick="addTP()" disabled>Add TP</button>
+        <button class="button" id="add-sl" onclick="addSL()" disabled>Add SL</button>
+        <button class="button" id="reset-values" onclick="resetValues()" disabled>Reset</button>
+        <form id="stats-form">
+            <table>
+                <thead>
+                    <tr>
+                        <th>WIN</th>
+                        <th>LOSE</th>
+                        <th>WINRATE</th>
+                        <th>PROFIT</th>
+                        <th>TP ($)</th>
+                        <th>SL ($)</th>
+                        <th>RR</th>
+                        <th>MAX Drawdown ($)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="number" id="win" name="win" value="0" oninput="updateCalculations()" disabled></td>
+                        <td><input type="number" id="lose" name="lose" value="0" oninput="updateCalculations()" disabled></td>
+                        <td id="winrate"></td>
+                        <td id="profit"></td>
+                        <td><input type="number" id="tp" name="tp" value="1000" oninput="updateCalculations()" disabled></td>
+                        <td><input type="number" id="sl" name="sl" value="500" oninput="updateCalculations()" disabled></td>
+                        <td id="rr"></td>
+                        <td id="maxDrawdown"></td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="6">NO. Trades</th>
+                        <td id="noTrades" colspan="2"></td>
+                    </tr>
+                    <tr>
+                        <th colspan="6">Balance</th>
+                        <td id="balance" colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </form>
+        <div id="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let balanceHistory = [];
+        let tradeLabels = [];
+        let maxDrawdown = 0;
+
+        function setInitialBalance() {
+            const initialBalanceInput = document.getElementById('initial-balance');
+            if (initialBalanceInput.value > 0) {
+                initialBalanceInput.disabled = true;
+                document.getElementById('set-initial').disabled = true;
+                enableButtons();
+                resetChart();
+                updateCalculations();
+            }
+        }
+
+        function enableButtons() {
+            document.getElementById('add-tp').disabled = false;
+            document.getElementById('add-sl').disabled = false;
+            document.getElementById('reset-values').disabled = false;
+            document.getElementById('win').disabled = false;
+            document.getElementById('lose').disabled = false;
+            document.getElementById('tp').disabled = false;
+            document.getElementById('sl').disabled = false;
+        }
+
+        function disableButtons() {
+            document.getElementById('add-tp').disabled = true;
+            document.getElementById('add-sl').disabled = true;
+            document.getElementById('reset-values').disabled = true;
+            document.getElementById('win').disabled = true;
+            document.getElementById('lose').disabled = true;
+            document.getElementById('tp').disabled = true;
+            document.getElementById('sl').disabled = true;
+            document.getElementById('initial-balance').disabled = false;
+            document.getElementById('set-initial').disabled = false;
+        }
+
+        function addTP() {
+            const winField = document.getElementById('win');
+            winField.value = parseFloat(winField.value) + 1;
+            updateCalculations();
+        }
+
+        function addSL() {
+            const loseField = document.getElementById('lose');
+            loseField.value = parseFloat(loseField.value) + 1;
+            updateCalculations();
+        }
+
+        function resetValues() {
+            document.getElementById('initial-balance').value = 10000;
+            document.getElementById('win').value = 0;
+            document.getElementById('lose').value = 0;
+            document.getElementById('tp').value = 1000;
+            document.getElementById('sl').value = 500;
+            balanceHistory = [];
+            tradeLabels = [];
+            maxDrawdown = 0;
+            disableButtons();
+            resetChart();
+            updateCalculations();
+        }
+
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        }
+
+        function updateCalculations() {
+            const initialBalance = parseFloat(document.getElementById('initial-balance').value);
+            const win = parseFloat(document.getElementById('win').value);
+            const lose = parseFloat(document.getElementById('lose').value);
+            const tp = parseFloat(document.getElementById('tp').value);
+            const sl = parseFloat(document.getElementById('sl').value);
+
+            const totalTrades = win + lose;
+            const winrate = (win / totalTrades) * 100;
+            const profit = (tp * win) - (sl * lose);
+            const rr = tp / sl;
+            const balance = initialBalance + profit;
+
+            document.getElementById('winrate').innerText = isNaN(winrate) ? '' : winrate.toFixed(2) + '%';
+            document.getElementById('profit').innerText = isNaN(profit) ? '' : '$' + formatNumber(profit.toFixed(2));
+            document.getElementById('rr').innerText = isNaN(rr) ? '' : rr.toFixed(2);
+            document.getElementById('noTrades').innerText = isNaN(totalTrades) ? '' : formatNumber(totalTrades);
+            document.getElementById('balance').innerText = isNaN(balance) ? '' : '$' + formatNumber(balance.toFixed(2));
+            
+            updateMaxDrawdown(balance);
+            document.getElementById('maxDrawdown').innerText = '$' + formatNumber(maxDrawdown.toFixed(2));
+
+            updateChart(balance, totalTrades);
+        }
+
+        function updateMaxDrawdown(balance) {
+            if (balanceHistory.length > 0) {
+                const peakBalance = Math.max(...balanceHistory);
+                const drawdown = peakBalance - balance;
+                if (drawdown > maxDrawdown) {
+                    maxDrawdown = drawdown;
+                }
+            }
+        }
+
+        function resetChart() {
+            balanceHistory = [];
+            tradeLabels = [];
+            myChart.data.labels = tradeLabels;
+            myChart.data.datasets[0].data = balanceHistory;
+            myChart.update();
+        }
+
+        function updateChart(balance, totalTrades) {
+            balanceHistory.push(balance);
+            tradeLabels.push(totalTrades);
+
+            if (balanceHistory.length > 50) {
+                balanceHistory.shift();
+                tradeLabels.shift();
+            }
+
+            myChart.data.labels = tradeLabels;
+            myChart.data.datasets[0].data = balanceHistory;
+            myChart.update();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: tradeLabels,
+                    datasets: [{
+                        label: 'Balance Over Time',
+                        backgroundColor: 'rgba(255, 215, 0, 0.2)',
+                        borderColor: 'rgba(255, 215, 0, 1)',
+                        data: balanceHistory,
+                        fill: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Number of Trades'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Balance ($)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            updateCalculations();
+        });
+    </script>
+</body>
+</html>
